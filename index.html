@@ -309,6 +309,13 @@
 
     <div id="lastScanBox"></div>
 
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:0 2px;">
+      <span style="font-size:12px;color:var(--muted);white-space:nowrap;">⏱ Cooldown:</span>
+      <input type="range" id="cooldownSlider" min="2" max="10" step="1" value="5"
+        style="flex:1;accent-color:var(--accent);"
+        oninput="SCAN_COOLDOWN_MS=this.value*1000; document.getElementById('cooldownVal').textContent=this.value+'s';">
+      <span id="cooldownVal" style="font-size:13px;font-weight:700;color:var(--accent);min-width:28px;">5s</span>
+    </div>
     <h2 class="section-title">Đã quét (<span id="scanCount">0</span> mã, tổng <span id="scanTotalQty">0</span> lượt)</h2>
     <div class="card" style="padding:0;">
       <div id="scannedList"></div>
@@ -409,6 +416,9 @@ const INVENTORY_DEFAULT = [{"n": "1274 - Đồng Hồ Thời Trang", "g": "4062 
 <script>
 /* ========================= STATE ========================= */
 let selectedStore = null;        // {id, name}
+let lastScannedCode = null;      // chống scan lặp
+let lastScannedTime = 0;         // timestamp lần scan cuối
+let SCAN_COOLDOWN_MS = 5000;      // ms chờ trước khi chấp nhận cùng 1 mã
 let selectedGroups = new Set(); // key = nganh+"|||"+nhom
 let scannedMap = new Map(); // maSP -> count
 let html5Qr = null;
@@ -646,9 +656,16 @@ function playBeep(found){
   }catch(e){}
 }
 
-function addScan(code){
+function addScan(code, fromCamera){
   code = (code||'').trim();
   if(!code) return;
+
+  // Cooldown: camera liên tục bắn cùng 1 mã → chỉ nhận sau SCAN_COOLDOWN_MS
+  const now = Date.now();
+  if(fromCamera && code === lastScannedCode && (now - lastScannedTime) < SCAN_COOLDOWN_MS) return;
+  lastScannedCode = code;
+  lastScannedTime = now;
+
   const item = findItemByCode(code);
   const cur = scannedMap.get(code) || 0;
   scannedMap.set(code, cur+1);
@@ -775,7 +792,7 @@ function toggleCamera(){
       disableFlip: false
     };
     html5Qr.start({ facingMode: "environment" }, config,
-      (decodedText)=>{ addScan(decodedText); },
+      (decodedText)=>{ addScan(decodedText, true); },
       (err)=>{ /* ignore per-frame errors */ }
     ).then(()=>{
       cameraOn = true;
