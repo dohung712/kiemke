@@ -625,8 +625,20 @@ function goToScan(){
   document.getElementById('lastScanBox').innerHTML = '';
 }
 
+function normalizeCode(raw){
+  if(!raw) return '';
+  raw = raw.trim();
+  // Nếu toàn số và độ dài 12 → thêm 0 đầu thành 13 chữ số (EAN-13)
+  if(/^\d{12}$/.test(raw)) return '0' + raw;
+  // Nếu toàn số và độ dài 11 → thêm 00 đầu
+  if(/^\d{11}$/.test(raw)) return '00' + raw;
+  return raw;
+}
+
 function findItemByCode(code){
-  return currentInventoryFiltered.find(it=>it.c === code) || INVENTORY.find(it=>it.c===code);
+  const norm = normalizeCode(code);
+  return currentInventoryFiltered.find(it=> it.c===code || it.c===norm || normalizeCode(it.c)===normalizeCode(code))
+    || INVENTORY.find(it=> it.c===code || it.c===norm || normalizeCode(it.c)===normalizeCode(code));
 }
 
 function playBeep(found){
@@ -659,6 +671,8 @@ function playBeep(found){
 function addScan(code, fromCamera){
   code = (code||'').trim();
   if(!code) return;
+  // Chuẩn hoá mã: bù số 0 đầu nếu thiếu để khớp với tồn kho
+  code = normalizeCode(code);
 
   // Cooldown: camera liên tục bắn cùng 1 mã → chỉ nhận sau SCAN_COOLDOWN_MS
   const now = Date.now();
@@ -680,15 +694,35 @@ function showLastScan(code, item, newCount){
   const box = document.getElementById('lastScanBox');
   if(item){
     const inSelected = currentInventoryFiltered.some(it=>it.c===code);
-    box.innerHTML = `<div class="last-scan ${inSelected?'':'notfound'}">
-      <div class="icon">${inSelected?'✅':'⚠️'}</div>
-      <div class="info"><div>${escapeHtml(item.t)}</div><div class="code">${escapeHtml(code)}${inSelected?'':' — không thuộc nhóm đã chọn'}</div></div>
-      <div class="count-badge">×${newCount}</div>
-    </div>`;
+    if(inSelected){
+      box.innerHTML = `<div class="last-scan">
+        <div class="icon">✅</div>
+        <div class="info"><div>${escapeHtml(item.t)}</div><div class="code">${escapeHtml(code)}</div></div>
+        <div class="count-badge">×${newCount}</div>
+      </div>`;
+    } else {
+      // Tìm trong toàn bộ tồn kho của siêu thị đang chọn
+      const storeInv = selectedStore
+        ? INVENTORY.filter(it=>String(it.s||'')===String(selectedStore.id))
+        : INVENTORY;
+      const found = storeInv.find(it=>it.c===code);
+      const groupInfo = found
+        ? `${escapeHtml(found.n)} › ${escapeHtml(found.g)}`
+        : null;
+      box.innerHTML = `<div class="last-scan notfound">
+        <div class="icon">⚠️</div>
+        <div class="info">
+          <div>${escapeHtml(item.t)}</div>
+          <div class="code">${escapeHtml(code)} — ngoài nhóm kiểm kê</div>
+          ${groupInfo ? `<div style="font-size:11px;margin-top:3px;color:var(--muted);">📂 ${groupInfo}</div>` : '<div style="font-size:11px;margin-top:3px;color:var(--muted);">Không thuộc siêu thị này</div>'}
+        </div>
+        <div class="count-badge">×${newCount}</div>
+      </div>`;
+    }
   }else{
     box.innerHTML = `<div class="last-scan notfound">
       <div class="icon">❓</div>
-      <div class="info"><div>Mã không có trong file tồn kho</div><div class="code">${escapeHtml(code)}</div></div>
+      <div class="info"><div>Mã không có trong tồn kho</div><div class="code">${escapeHtml(code)}</div></div>
       <div class="count-badge">×${newCount}</div>
     </div>`;
   }
@@ -913,14 +947,19 @@ function renderResultList(){
   items.forEach(r=>{
     const div = document.createElement('div');
     div.className = 'result-item ' + r.status;
-    const diffStr = r.chenhLech>0 ? '+'+r.chenhLech : r.chenhLech;
+    const diffStr = r.chenhLech>0 ? '+'+r.chenhLech : String(r.chenhLech);
+    const diffColor = r.chenhLech !== 0 ? 'color:#d32f2f;' : 'color:var(--ok);';
     div.innerHTML = `<div class="info">
         <div class="tname">${escapeHtml(r.ten)}</div>
         <div class="meta">${escapeHtml(r.maSP)} · ${escapeHtml(r.nganh)} / ${escapeHtml(r.nhom)}</div>
+        <div class="meta" style="margin-top:4px; font-size:12px;">
+          <span style="background:#f0f0f0;border-radius:4px;padding:2px 7px;margin-right:4px;">Hệ: <b>${r.slHe}</b></span>
+          <span style="background:#f0f0f0;border-radius:4px;padding:2px 7px;">Thực: <b>${r.slThucTe}</b></span>
+        </div>
       </div>
-      <div class="nums">
-        <div>Hệ: ${r.slHe} | Thực: ${r.slThucTe}</div>
-        <div class="diff">${diffStr}</div>
+      <div class="nums" style="min-width:64px;">
+        <div class="diff" style="${diffColor} font-size:22px; font-weight:900; line-height:1;">${diffStr}</div>
+        <div style="font-size:11px; color:var(--muted); margin-top:2px;">${r.chenhLech===0?'Đủ':r.chenhLech<0?'Thiếu':'Dư'}</div>
       </div>`;
     container.appendChild(div);
   });
