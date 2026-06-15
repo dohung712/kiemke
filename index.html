@@ -244,6 +244,18 @@
   .preview-table th, .preview-table td{border-bottom:1px solid var(--line); padding:6px 8px; text-align:left;}
   .preview-table th{color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase;}
   .preview-wrap{max-height:240px; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:8px;}
+
+  /* STORE SELECT */
+  .store-card{
+    background:var(--paper2); border:1px solid var(--line); border-radius:14px;
+    padding:16px 14px; margin-bottom:10px; cursor:pointer; display:flex;
+    align-items:center; gap:12px; transition:border-color .15s;
+  }
+  .store-card:active, .store-card.selected{ border-color:var(--accent); background:#eaf4ee; }
+  .store-card .store-icon{ font-size:28px; flex-shrink:0; }
+  .store-card .store-info{ flex:1; }
+  .store-card .store-name{ font-weight:700; font-size:14px; }
+  .store-card .store-id{ font-size:11px; font-family:var(--mono); color:var(--muted); margin-top:2px; }
 </style>
 </head>
 <body>
@@ -261,8 +273,15 @@
 
 <main>
 
+  <!-- SCREEN 0: CHỌN SIÊU THỊ -->
+  <section class="screen active" id="screen-store">
+    <h2 class="section-title">Bước 1 — Chọn siêu thị</h2>
+    <div id="storeSync"></div>
+    <div id="storeList"><div class="empty-note">Đang tải...</div></div>
+  </section>
+
   <!-- SCREEN 1: CHỌN NHÓM HÀNG -->
-  <section class="screen active" id="screen-select">
+  <section class="screen" id="screen-select">
     <h2 class="section-title">Bước 1 — Chọn nhóm hàng cần kiểm kê</h2>
     <div id="syncBadge"></div>
     <div class="search-wrap">
@@ -346,8 +365,9 @@
     <div class="card">
       <label class="label-sm">Cấu hình kết nối (1 lần)</label>
       <div class="info-text" style="margin-top:0;">Dán URL Web App của Google Apps Script (xem hướng dẫn trong README) để bật đồng bộ. Sau khi lưu, mọi máy mở link sẽ tự dùng URL này.</div>
-      <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-      <button class="btn btn-secondary" style="margin-top:10px;" onclick="saveApiUrl()">Lưu cấu hình</button>
+      <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" oninput="autoSaveApiUrl(this.value)">
+      <div id="apiSaveStatus" class="info-text" style="margin-top:4px; min-height:18px;"></div>
+      <button class="btn btn-secondary" style="margin-top:6px;" onclick="saveApiUrl()">Lưu &amp; đồng bộ ngay</button>
     </div>
   </section>
 
@@ -356,7 +376,12 @@
 <div class="toast" id="toast"></div>
 
 <!-- BOTTOM BARS -->
-<div class="bottombar" id="bar-select">
+<div class="bottombar" id="bar-store">
+  <button class="btn btn-primary" id="btnGoSelect" onclick="goToSelect()" disabled>Chọn nhóm hàng →</button>
+</div>
+
+<div class="bottombar" id="bar-select" style="display:none;">
+  <button class="btn btn-secondary btn-small" onclick="goScreen('store')" style="flex:none;padding:13px 14px;">◀ Đổi ST</button>
   <button class="btn btn-primary" onclick="goToScan()">Bắt đầu quét (<span id="selCount">0</span> nhóm)</button>
 </div>
 
@@ -384,6 +409,7 @@ const INVENTORY_DEFAULT = [{"n": "1274 - Đồng Hồ Thời Trang", "g": "4062 
 </script>
 <script>
 /* ========================= STATE ========================= */
+let selectedStore = null;        // {id, name}
 let selectedGroups = new Set(); // key = nganh+"|||"+nhom
 let scannedMap = new Map(); // maSP -> count
 let html5Qr = null;
@@ -456,11 +482,13 @@ async function loadInventoryFromServer(){
     if(data.items && data.items.length){
       INVENTORY = data.items;
       inventoryUpdatedAt = data.updatedAt || null;
+      selectedStore = null; // reset để chọn lại siêu thị với data mới
     }
     GROUP_INDEX = buildGroupIndex();
     renderGroupList();
     const dateStr = inventoryUpdatedAt ? new Date(inventoryUpdatedAt).toLocaleString('vi-VN') : '';
     renderSyncBadge('syncBadge', 'ok', dateStr ? ('cập nhật ' + dateStr) : '');
+    renderSyncBadge('storeSync', 'ok', dateStr ? ('cập nhật ' + dateStr) : '');
   }catch(e){
     renderSyncBadge('syncBadge', 'err');
   }
@@ -470,13 +498,14 @@ async function loadInventoryFromServer(){
 function goScreen(name){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
-  ['select','scan','result','history','admin'].forEach(n=>{
+  ['store','select','scan','result','history','admin'].forEach(n=>{
     const bar = document.getElementById('bar-'+n);
     if(bar) bar.style.display = (n===name)?'flex':'none';
   });
   if(name==='history') renderHistory();
   if(name==='select') renderGroupList();
   if(name==='admin') initAdminScreen();
+  if(name==='store') renderStoreList();
   window.scrollTo(0,0);
 }
 
@@ -491,7 +520,12 @@ function showToast(msg){
 /* ========================= GROUP SELECTION ========================= */
 function buildGroupIndex(){
   const idx = {}; // nganh -> { nhom -> count }
-  INVENTORY.forEach(item=>{
+  // Nếu có mã siêu thị trong data thì filter, không thì dùng hết
+  const hasStoreField = INVENTORY.length > 0 && INVENTORY[0].s;
+  const items = (hasStoreField && selectedStore)
+    ? INVENTORY.filter(it => String(it.s||'') === String(selectedStore.id))
+    : INVENTORY;
+  items.forEach(item=>{
     if(!idx[item.n]) idx[item.n] = {};
     if(!idx[item.n][item.g]) idx[item.n][item.g] = 0;
     idx[item.n][item.g]++;
@@ -571,7 +605,11 @@ let currentInventoryFiltered = []; // items belonging to selected groups
 
 function goToScan(){
   if(selectedGroups.size===0){ showToast('Vui lòng chọn ít nhất 1 nhóm hàng'); return; }
-  currentInventoryFiltered = INVENTORY.filter(it=>selectedGroups.has(it.n+'|||'+it.g));
+  const hasStoreField = INVENTORY.length > 0 && INVENTORY[0].s;
+  const storeInv = (hasStoreField && selectedStore)
+    ? INVENTORY.filter(it=>String(it.s||'')===String(selectedStore.id))
+    : INVENTORY;
+  currentInventoryFiltered = storeInv.filter(it=>selectedGroups.has(it.n+'|||'+it.g));
   scannedMap = new Map();
   goScreen('scan');
   renderScannedList();
@@ -580,6 +618,33 @@ function goToScan(){
 
 function findItemByCode(code){
   return currentInventoryFiltered.find(it=>it.c === code) || INVENTORY.find(it=>it.c===code);
+}
+
+function playBeep(found){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if(found){
+      // Tiếng bíp cao, ngắn → mã hợp lệ trong nhóm
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(1320, ctx.currentTime);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.12);
+    }else{
+      // Tiếng bíp thấp hơn → mã ngoài nhóm hoặc không có trong tồn kho
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  }catch(e){}
 }
 
 function addScan(code){
@@ -591,6 +656,8 @@ function addScan(code){
   renderScannedList();
   showLastScan(code, item, cur+1);
   if(navigator.vibrate) navigator.vibrate(60);
+  const inSelected = currentInventoryFiltered.some(it=>it.c===code);
+  playBeep(inSelected);
 }
 
 function showLastScan(code, item, newCount){
@@ -894,6 +961,8 @@ function saveHistory(results){
   const entry = {
     date: now.toISOString(),
     dateLabel: now.toLocaleString('vi-VN'),
+    maSieuThi:  selectedStore ? String(selectedStore.id)   : '',
+    tenSieuThi: selectedStore ? String(selectedStore.name) : '',
     groups: groupsList,
     stats: {
       ok: results.filter(r=>r.status==='ok').length,
@@ -933,6 +1002,7 @@ function renderHistory(){
       div.className = 'hist-item';
       div.innerHTML = `<div class="info">
           <div class="date">${h.dateLabel}</div>
+          ${h.tenSieuThi ? `<div class="meta" style="font-weight:600;color:var(--accent-d);font-size:12px;">🏪 ${escapeHtml(h.tenSieuThi)}</div>` : ''}
           <div class="meta">${h.groups.length} nhóm hàng — Đủ ${h.stats.ok} · Thiếu ${h.stats.thieu} · Dư ${h.stats.du}</div>
         </div>
         <div class="arrow">›</div>`;
@@ -975,10 +1045,75 @@ function renderHistory(){
   });
 }
 
+/* ========================= STORE SCREEN ========================= */
+function getStores(){
+  const map = {};
+  INVENTORY.forEach(it=>{
+    const id = String(it.s||'');
+    if(id && !map[id]) map[id] = it.st || id;
+  });
+  return Object.entries(map).map(([id,name])=>({id,name}));
+}
+
+function renderStoreList(){
+  const list = document.getElementById('storeList');
+  const stores = getStores();
+
+  // Nếu dữ liệu không có mã siêu thị → bỏ qua bước này, vào chọn nhóm luôn
+  if(stores.length === 0 && INVENTORY.length > 0){
+    selectedStore = null;
+    GROUP_INDEX = buildGroupIndex();
+    goScreen('select');
+    return;
+  }
+
+  if(stores.length === 0){
+    list.innerHTML = '<div class="empty-note">Đang tải dữ liệu tồn kho...</div>';
+    document.getElementById('btnGoSelect').disabled = true;
+    return;
+  }
+  list.innerHTML = '';
+  stores.forEach(st=>{
+    const card = document.createElement('div');
+    card.className = 'store-card' + (selectedStore && selectedStore.id===st.id ? ' selected' : '');
+    card.innerHTML = '<div class="store-icon">🏪</div>'
+      + '<div class="store-info">'
+      + '<div class="store-name">' + escapeHtml(st.name) + '</div>'
+      + '<div class="store-id">Mã: ' + escapeHtml(st.id) + '</div>'
+      + '</div>';
+    card.onclick = ()=>{
+      selectedStore = st;
+      document.querySelectorAll('.store-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      document.getElementById('btnGoSelect').disabled = false;
+      document.getElementById('topSub').textContent = st.name;
+    };
+    list.appendChild(card);
+  });
+  // Auto-chọn nếu chỉ có 1 siêu thị
+  if(stores.length === 1 && !selectedStore){
+    selectedStore = stores[0];
+    list.querySelector('.store-card').classList.add('selected');
+    document.getElementById('btnGoSelect').disabled = false;
+    document.getElementById('topSub').textContent = stores[0].name;
+  }
+}
+
+function goToSelect(){
+  if(!selectedStore){ showToast('Vui lòng chọn siêu thị'); return; }
+  selectedGroups = new Set();
+  GROUP_INDEX = buildGroupIndex();
+  goScreen('select');
+}
+
 /* ========================= INIT ========================= */
+(function autoSetApiUrl(){
+  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycby9ekoiOtnAja450yptSa6142mb4_f8rndjdkKT3N7RMOqwxGAC6Ihclm7KQJOZqp4mHA/exec';
+  if(!getApiUrl()) setApiUrl(DEFAULT_API_URL);
+})();
 GROUP_INDEX = buildGroupIndex();
 renderGroupList();
-loadInventoryFromServer();
+loadInventoryFromServer().then(()=>{ renderStoreList(); }).catch(()=>{ renderStoreList(); });
 
 /* ========================= ADMIN SCREEN ========================= */
 let pendingUploadItems = null;
@@ -988,8 +1123,10 @@ function initAdminScreen(){
   document.getElementById('uploadStatus').textContent = '';
   document.getElementById('uploadStatus').innerHTML =
     `Tồn kho hiện tại: <b>${INVENTORY.length}</b> mã sản phẩm. Cập nhật lần cuối: <b>${dateStr}</b>.`;
-  const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyajbgC_VfOqUSbzL392B3peitZ6PXL1LADnO6x3cWXc0t1el87zSEfnZHnB1rAcKesKg/exec';
-  document.getElementById('apiUrlInput').value = getApiUrl() || DEFAULT_API_URL;
+  const currentUrl = getApiUrl();
+  document.getElementById('apiUrlInput').value = currentUrl;
+  const apiStatus = document.getElementById('apiSaveStatus');
+  if(apiStatus) apiStatus.innerHTML = currentUrl ? '<span style="color:var(--ok)">✓ Đã lưu</span>' : '';
 
   const drop = document.getElementById('fileDrop');
   drop.ondragover = (e)=>{ e.preventDefault(); drop.classList.add('dragover'); };
@@ -1003,11 +1140,38 @@ function initAdminScreen(){
   };
 }
 
+let _autoSaveTimer = null;
+function autoSaveApiUrl(val){
+  val = val.trim();
+  const statusEl = document.getElementById('apiSaveStatus');
+  clearTimeout(_autoSaveTimer);
+  if(!val){ if(statusEl) statusEl.textContent = ''; return; }
+  if(!val.startsWith('https://')) { if(statusEl) statusEl.textContent = ''; return; }
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--muted)">⏳ Đang lưu...</span>';
+  _autoSaveTimer = setTimeout(()=>{
+    setApiUrl(val);
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Đã lưu — đang đồng bộ...</span>';
+    loadInventoryFromServer().then(()=>{
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Đã lưu & đồng bộ</span>';
+      showToast('Đã lưu & đồng bộ');
+    }).catch(()=>{
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--warn)">Đã lưu — không kết nối được server</span>';
+    });
+  }, 600);
+}
+
 function saveApiUrl(){
   const val = document.getElementById('apiUrlInput').value.trim();
   setApiUrl(val);
-  showToast(val ? 'Đã lưu cấu hình' : 'Đã xoá cấu hình');
-  loadInventoryFromServer();
+  const statusEl = document.getElementById('apiSaveStatus');
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Đã lưu — đang đồng bộ...</span>';
+  showToast(val ? 'Đã lưu — đang đồng bộ...' : 'Đã xoá cấu hình');
+  loadInventoryFromServer().then(()=>{
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Đã lưu & đồng bộ</span>';
+    showToast('Đã đồng bộ xong');
+  }).catch(()=>{
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--warn)">Đã lưu — không kết nối được server</span>';
+  });
 }
 
 function handleFileSelect(event){
@@ -1029,16 +1193,19 @@ function handleFileSelect(event){
 
       dataRows.forEach(row=>{
         if(!row || row.length < 10) return;
+        const maSieuThi = String(row[0] ?? '').trim();
+        const tenSieuThi = String(row[1] ?? '').trim();
         const nganh = String(row[3] ?? '').trim();
         const nhom = String(row[4] ?? '').trim();
         const maSP = String(row[6] ?? '').trim();
         const ten = String(row[7] ?? '').trim();
         const sl = Number(row[9] ?? 0) || 0;
         if(!maSP) return;
-        if(!merged[maSP]){
-          merged[maSP] = {n: nganh, g: nhom, c: maSP, t: ten, q: 0};
+        const key = maSieuThi + '|||' + maSP;
+        if(!merged[key]){
+          merged[key] = {s: maSieuThi, st: tenSieuThi, n: nganh, g: nhom, c: maSP, t: ten, q: 0};
         }
-        merged[maSP].q += sl;
+        merged[key].q += sl;
       });
 
       const items = Object.values(merged);
