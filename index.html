@@ -454,8 +454,9 @@ let inventoryUpdatedAt = null;
 let GROUP_INDEX = {};
 
 /* ========================= API / SYNC ========================= */
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzEsE_ZnFjPBOleKS3EJDTxjHJN0lIYJlEU6tKw5nprMpN6f9ZatcXwfdA5ZqlpQUey7A/exec';
 function getApiUrl(){
-  try{ return localStorage.getItem(API_URL_KEY) || ''; }catch(e){ return ''; }
+  try{ return localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL; }catch(e){ return DEFAULT_API_URL; }
 }
 function setApiUrl(url){
   try{ localStorage.setItem(API_URL_KEY, url); }catch(e){}
