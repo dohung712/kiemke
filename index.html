@@ -462,25 +462,52 @@ function setApiUrl(url){
   try{ localStorage.setItem(API_URL_KEY, url); }catch(e){}
 }
 
+function xhrGet(url){
+  return new Promise(function(resolve, reject){
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.onload = function(){
+      if(xhr.status >= 200 && xhr.status < 300){
+        try{ resolve(JSON.parse(xhr.responseText)); }
+        catch(e){ reject(new Error('JSON parse error')); }
+      } else {
+        reject(new Error('HTTP ' + xhr.status));
+      }
+    };
+    xhr.onerror = function(){ reject(new Error('Network error')); };
+    xhr.send();
+  });
+}
+
+function xhrPost(url, body){
+  return new Promise(function(resolve, reject){
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+    xhr.onload = function(){
+      if(xhr.status >= 200 && xhr.status < 300){
+        try{ resolve(JSON.parse(xhr.responseText)); }
+        catch(e){ reject(new Error('JSON parse error')); }
+      } else {
+        reject(new Error('HTTP ' + xhr.status));
+      }
+    };
+    xhr.onerror = function(){ reject(new Error('Network error')); };
+    xhr.send(JSON.stringify(body));
+  });
+}
+
 async function apiGet(action){
   const base = getApiUrl();
   if(!base) throw new Error('NO_API_URL');
   const url = base + (base.includes('?') ? '&' : '?') + 'action=' + action;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  return await res.json();
+  return await xhrGet(url);
 }
 
 async function apiPost(body){
   const base = getApiUrl();
   if(!base) throw new Error('NO_API_URL');
-  const res = await fetch(base, {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify(body)
-  });
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  return await res.json();
+  return await xhrPost(base, body);
 }
 
 function renderSyncBadge(elId, state, extra){
