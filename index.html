@@ -364,6 +364,36 @@
   <section class="screen" id="screen-scan">
     <h2 class="section-title">Bước 2 — Quét mã sản phẩm</h2>
 
+    <!-- PANEL THỐNG KÊ NHÓM KIỂM KÊ -->
+    <div id="groupSummaryPanel" style="background:var(--paper2);border:1.5px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:4px;">
+        <span style="font-size:13px;font-weight:800;color:var(--ink);">📋 Nhóm đang kiểm kê</span>
+        <span id="groupSummaryNames" style="font-size:11px;color:var(--muted);text-align:right;max-width:65%;"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div style="text-align:center;background:var(--paper);border-radius:8px;padding:8px 4px;">
+          <div id="gsTotalSku" style="font-size:22px;font-weight:900;color:var(--ink);">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Tổng SP</div>
+        </div>
+        <div style="text-align:center;background:#d4edda;border-radius:8px;padding:8px 4px;">
+          <div id="gsChecked" style="font-size:22px;font-weight:900;color:#1a7f37;">0</div>
+          <div style="font-size:11px;color:#1a7f37;margin-top:2px;">Đã kiểm</div>
+        </div>
+        <div style="text-align:center;background:#f8d7da;border-radius:8px;padding:8px 4px;">
+          <div id="gsMissing" style="font-size:22px;font-weight:900;color:#b02a37;">0</div>
+          <div style="font-size:11px;color:#b02a37;margin-top:2px;">Còn thiếu</div>
+        </div>
+      </div>
+      <div style="background:var(--line);border-radius:999px;height:7px;overflow:hidden;margin-bottom:8px;">
+        <div id="gsProgressBar" style="height:100%;border-radius:999px;background:linear-gradient(90deg,#2ea043,#56d364);width:0%;transition:width 0.3s;"></div>
+      </div>
+      <details id="gsMissingDetail">
+        <summary style="font-size:12px;font-weight:700;color:#b02a37;cursor:pointer;user-select:none;">📄 Danh sách còn thiếu (<span id="gsMissingCount">0</span> SP)</summary>
+        <div id="gsMissingList" style="margin-top:8px;max-height:220px;overflow-y:auto;font-size:12px;line-height:1.8;color:var(--ink);"></div>
+      </details>
+    </div>
+    <!-- /PANEL THỐNG KÊ -->
+
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
       <input type="text" id="staffName" placeholder="Tên người kiểm kê (tuỳ chọn)"
         style="flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--paper2);color:var(--ink);"
@@ -862,11 +892,36 @@ function showLastScan(code, item, newCount){
   if(item){
     const inSelected = currentInventoryFiltered.some(it=>it.c===code);
     if(inSelected){
-      box.innerHTML = `<div class="last-scan">
-        <div class="icon">✅</div>
-        <div class="info"><div>${escapeHtml(item.t)}</div><div class="code">${escapeHtml(code)}</div></div>
-        <div class="count-badge">×${newCount}</div>
-        <button class="quick-add" onclick="addScan(${JSON.stringify(code)},false)" title="Thêm 1">+</button>
+      const tonKho = Number(item.q) || 0;
+      const diff = newCount - tonKho;
+      let statusIcon, statusLabel, statusColor, statusBg;
+      if(diff > 0){
+        statusIcon='🔴'; statusLabel=`THỪA +${diff}`; statusColor='#b02a37'; statusBg='#f8d7da';
+      } else if(diff < 0){
+        statusIcon='🟡'; statusLabel=`THIẾU ${diff}`; statusColor='#856404'; statusBg='#fff3cd';
+      } else {
+        statusIcon='🟢'; statusLabel='ĐỦ'; statusColor='#1a7f37'; statusBg='#d4edda';
+      }
+      box.innerHTML = `<div class="last-scan" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="icon">${statusIcon}</div>
+          <div class="info" style="flex:1;"><div>${escapeHtml(item.t)}</div><div class="code">${escapeHtml(code)}</div></div>
+          <button class="quick-add" onclick="addScan(${JSON.stringify(code)},false)" title="Thêm 1">+</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;">
+          <div style="background:var(--paper);border-radius:8px;padding:5px 4px;">
+            <div style="font-size:18px;font-weight:900;color:var(--ink);">${tonKho}</div>
+            <div style="font-size:10px;color:var(--muted);">Tồn kho</div>
+          </div>
+          <div style="background:var(--paper);border-radius:8px;padding:5px 4px;">
+            <div style="font-size:18px;font-weight:900;color:var(--accent);">${newCount}</div>
+            <div style="font-size:10px;color:var(--muted);">Đã quét</div>
+          </div>
+          <div style="background:${statusBg};border-radius:8px;padding:5px 4px;">
+            <div style="font-size:14px;font-weight:900;color:${statusColor};">${statusLabel}</div>
+            <div style="font-size:10px;color:${statusColor};">Trạng thái</div>
+          </div>
+        </div>
       </div>`;
     } else {
       // Tìm trong toàn bộ tồn kho của siêu thị đang chọn
@@ -925,14 +980,33 @@ function renderScannedList(){
     entries.forEach(([code,count])=>{
       total += count;
       const item = INVENTORY.find(it=>it.c===code);
+      const tonKho = item ? (Number(item.q)||0) : null;
+      const diff = tonKho !== null ? count - tonKho : null;
+      let badgeStyle, badgeText;
+      if(diff === null){
+        badgeStyle='background:#eee;color:#888;'; badgeText='?';
+      } else if(diff > 0){
+        badgeStyle='background:#f8d7da;color:#b02a37;'; badgeText=`+${diff} thừa`;
+      } else if(diff < 0){
+        badgeStyle='background:#fff3cd;color:#856404;'; badgeText=`${diff} thiếu`;
+      } else {
+        badgeStyle='background:#d4edda;color:#1a7f37;'; badgeText='đủ';
+      }
       const row = document.createElement('div');
       row.className = 'scanned-list-item';
-      row.innerHTML = `<div class="info">${item?escapeHtml(item.t):'<i>Mã không xác định</i>'}<div class="code">${escapeHtml(code)}</div></div>
+      row.innerHTML = `<div class="info" style="flex:1;min-width:0;">
+          ${item?escapeHtml(item.t):'<i>Mã không xác định</i>'}
+          <div class="code">${escapeHtml(code)}</div>
+          ${tonKho!==null?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">Tồn: <b>${tonKho}</b></div>`:''}
+        </div>
         <div class="stepper">
           <button onclick="stepScan('${code}',-1)">−</button>
           <button onclick="stepScan('${code}',1)">+</button>
         </div>
-        <div class="qty">${count}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div class="qty">${count}</div>
+          <div style="font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px;white-space:nowrap;${badgeStyle}">${badgeText}</div>
+        </div>
         <button class="del" onclick="removeScan('${code}')">✕</button>`;
       list.appendChild(row);
     });
@@ -942,6 +1016,47 @@ function renderScannedList(){
   let totalQty = 0;
   scannedMap.forEach(v=>totalQty+=v);
   document.getElementById('scanTotalQty').textContent = totalQty;
+  updateGroupSummary();
+}
+
+function updateGroupSummary(){
+  const totalSku = currentInventoryFiltered.length;
+  // Đã kiểm = các mã trong currentInventoryFiltered mà scannedMap có
+  const checkedCodes = new Set(
+    currentInventoryFiltered.map(it=>it.c).filter(c=>scannedMap.has(c))
+  );
+  const checked = checkedCodes.size;
+  const missing = totalSku - checked;
+
+  document.getElementById('gsTotalSku').textContent = totalSku;
+  document.getElementById('gsChecked').textContent = checked;
+  document.getElementById('gsMissing').textContent = missing;
+  document.getElementById('gsMissingCount').textContent = missing;
+
+  const pct = totalSku > 0 ? Math.round(checked / totalSku * 100) : 0;
+  document.getElementById('gsProgressBar').style.width = pct + '%';
+
+  // Tên nhóm
+  const names = Array.from(selectedGroups).map(k=>k.split('|||')[1]).join(' · ');
+  document.getElementById('groupSummaryNames').textContent = names;
+
+  // Danh sách còn thiếu — sắp xếp theo tên sản phẩm
+  const missingItems = currentInventoryFiltered
+    .filter(it=>!scannedMap.has(it.c))
+    .sort((a,b)=>(a.t||'').localeCompare(b.t||'', 'vi'));
+
+  const listEl = document.getElementById('gsMissingList');
+  if(missingItems.length === 0){
+    listEl.innerHTML = '<div style="color:#1a7f37;font-weight:700;padding:4px 0;">✅ Đã kiểm đủ tất cả sản phẩm!</div>';
+  } else {
+    listEl.innerHTML = missingItems.map((it,i)=>
+      `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--line);">
+        <span style="color:var(--muted);min-width:22px;text-align:right;">${i+1}.</span>
+        <span style="flex:1;">${escapeHtml(it.t||'')}</span>
+        <span style="color:var(--muted);font-size:11px;">${escapeHtml(it.c||'')}</span>
+      </div>`
+    ).join('');
+  }
 }
 
 function stepScan(code, delta){
