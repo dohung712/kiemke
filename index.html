@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Kiểm Kê Kho — TGD 933</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <style>
   :root{
     --ink:#1a2b22;
@@ -256,6 +256,7 @@
   .dot.err{background:var(--bad);}
   .dot.loading{background:var(--muted); animation:blink 1s infinite;}
   @keyframes blink{50%{opacity:.3;}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
   .file-drop{
     border:2px dashed var(--line); border-radius:12px; padding:24px; text-align:center;
@@ -404,7 +405,42 @@
       <button class="btn btn-secondary btn-small" onclick="document.getElementById('manualInput').focus()">⌨️ Nhập tay</button>
     </div>
 
-    <div id="qr-reader" style="display:none;"></div>
+    <div id="qr-reader" style="display:none;position:relative;border-radius:14px;overflow:hidden;background:#000;">
+      <video id="camVideo" autoplay playsinline muted style="width:100%;display:block;"></video>
+      <canvas id="camCanvas" style="display:none;"></canvas>
+      <!-- Overlay khung ngắm — vẽ bằng SVG để chính xác hơn -->
+      <div id="camOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;align-items:center;justify-content:center;">
+        <svg id="camSvg" viewBox="0 0 100 100" preserveAspectRatio="none"
+             style="position:absolute;top:0;left:0;width:100%;height:100%;">
+          <!-- dim vùng ngoài khung -->
+          <defs>
+            <mask id="scanMask">
+              <rect width="100" height="100" fill="white"/>
+              <rect x="5" y="30" width="90" height="40" rx="3" fill="black"/>
+            </mask>
+          </defs>
+          <rect width="100" height="100" fill="rgba(0,0,0,0.38)" mask="url(#scanMask)"/>
+          <!-- 4 góc khung sáng -->
+          <g stroke="rgba(255,255,255,0.9)" stroke-width="0.8" fill="none">
+            <path d="M5,38 L5,30 L13,30"/>
+            <path d="M87,30 L95,30 L95,38"/>
+            <path d="M95,62 L95,70 L87,70"/>
+            <path d="M13,70 L5,70 L5,62"/>
+          </g>
+          <!-- đường laser quét (animation) -->
+          <line id="laserLine" x1="5" y1="50" x2="95" y2="50" stroke="rgba(80,255,120,0.7)" stroke-width="0.4">
+            <animateTransform attributeName="transform" type="translate" from="0,-18" to="0,18"
+              dur="1.4s" repeatCount="indefinite" additive="sum"
+              calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4,0,0.6,1 0.4,0,0.6,1"
+              values="0,-18;0,18;0,-18"/>
+          </line>
+        </svg>
+        <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;
+                    font-size:11px;color:rgba(255,255,255,.75);font-weight:700;letter-spacing:.03em;">
+          Đưa vạch mã vào khung · giữ thẳng và gần camera
+        </div>
+      </div>
+    </div>
 
     <div class="manual-row" style="margin-bottom:12px;">
       <input type="text" id="manualInput" placeholder="Nhập / dán mã sản phẩm rồi Enter" inputmode="numeric">
@@ -519,8 +555,9 @@
 <div class="bottombar" id="bar-result" style="display:none;">
   <button class="btn btn-secondary btn-small" onclick="goScreen('scan')" style="flex:none;padding:13px 12px;">↩ Quét tiếp</button>
   <button class="btn btn-secondary btn-small" onclick="exportResultImage()" style="flex:none;padding:13px 12px;">📷</button>
-  <button class="btn btn-secondary btn-small" onclick="exportExcel()" style="flex:none;padding:13px 12px;">📊 Excel</button>
-  <button class="btn btn-primary" onclick="syncResultNow()" style="flex:1;">☁ Đồng bộ</button>
+  <button class="btn btn-secondary btn-small" onclick="exportExcel()" style="flex:none;padding:13px 12px;">📊</button>
+  <button class="btn btn-secondary btn-small" onclick="copyResultText()" style="flex:none;padding:13px 12px;">📋 Copy</button>
+  <button class="btn btn-primary" onclick="syncResultNow()" style="flex:none;padding:13px 14px;">☁</button>
 </div>
 
 <div class="bottombar" id="bar-history" style="display:none;">
@@ -546,7 +583,6 @@ let lastScannedTime = 0;         // timestamp lần scan cuối
 let SCAN_COOLDOWN_MS = 2000;      // ms chờ trước khi chấp nhận cùng 1 mã
 let selectedGroups = new Set(); // key = nganh+"|||"+nhom
 let scannedMap = new Map(); // maSP -> count
-let html5Qr = null;
 let cameraOn = false;
 let resultTab = 'thieu';
 let currentResults = null;
@@ -1104,91 +1140,239 @@ function isSecureContextOk(){
   return window.isSecureContext === true;
 }
 
+/* ========== CAMERA NATIVE (iOS Safari compatible) ========== */
+let camStream    = null;
+let camRafId     = null;
+let camDetector  = null;   // BarcodeDetector (native)
+let zxingReader  = null;   // ZXing fallback
+let _offCanvas   = null;   // reusable offscreen canvas
+let _offCtx      = null;
+
 function toggleCamera(){
-  const box = document.getElementById('qr-reader');
+  if(!cameraOn){ startCamera(); } else { stopCamera(); }
+}
+
+async function startCamera(){
   const btn = document.getElementById('btnCam');
-  if(!cameraOn){
-    if(!isSecureContextOk()){
-      showCameraHelp('Trang này chưa chạy ở HTTPS nên trình duyệt chặn camera. Hãy mở tool qua link https (ví dụ link GitHub Pages), hoặc dùng ô "Nhập tay" bên dưới.');
-      return;
-    }
-    box.style.display = 'block';
-    box.innerHTML = '';
-    html5Qr = new Html5Qrcode("qr-reader", {
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.CODE_93,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.DATA_MATRIX
-      ],
-      verbose: false
-    });
-    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-    const config = {
-      fps: isIOS ? 10 : 20,
-      qrbox: (viewfinderW, viewfinderH) => {
-        const minEdge = Math.min(viewfinderW, viewfinderH);
-        return {
-          width:  Math.floor(minEdge * (isIOS ? 0.92 : 0.85)),
-          height: Math.floor(minEdge * (isIOS ? 0.45 : 0.55))
-        };
-      },
-      // Không set aspectRatio cứng — Safari iOS không hỗ trợ tốt
-      disableFlip: false,
-      rememberLastUsedCamera: true,
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-    };
-    // iOS Safari cần constraints đơn giản, không dùng advanced constraints
-    const cameraConstraints = isIOS
-      ? { facingMode: { exact: "environment" } }
-      : { facingMode: "environment" };
+  const box = document.getElementById('qr-reader');
 
-    const tryStart = (constraints) => html5Qr.start(constraints, config,
-      (decodedText)=>{ addScan(decodedText, true); },
-      ()=>{}
-    );
-
-    tryStart(cameraConstraints)
-      .catch(()=> tryStart({ facingMode: "environment" })) // fallback nếu exact fail
-      .then(()=>{
-        cameraOn = true;
-        btn.textContent = '📷 Tắt camera';
-        hideCameraHelp();
-        showZoomHint();
-      }).catch(err=>{
-        const msg = String(err);
-        let help = 'Không mở được camera. ';
-        if(msg.includes('NotAllowedError') || msg.includes('Permission denied')){
-          help += isIOS
-            ? 'iPhone/iPad (Safari): vào Cài đặt → Safari → Camera → chọn "Hỏi" hoặc "Cho phép". Sau đó tải lại trang và bấm Cho phép khi được hỏi. Nếu vẫn lỗi: Cài đặt → Safari → Nâng cao → Dữ liệu trang web → xoá dữ liệu trang này rồi thử lại.'
-            : 'Trình duyệt đang chặn quyền camera. Chạm vào biểu tượng khoá/ⓘ trên thanh địa chỉ → Camera → Cho phép.';
-        }else if(msg.includes('NotFoundError')){
-          help += 'Không tìm thấy camera sau trên thiết bị.';
-        }else if(msg.includes('NotReadableError')){
-          help += 'Camera đang được app khác dùng. Đóng app camera/video rồi thử lại.';
-        }else if(msg.includes('OverconstrainedError') || msg.includes('Overconstrained')){
-          help += 'Thiết bị không hỗ trợ camera sau ở chế độ này. Thử tải lại trang.';
-        }else{
-          help += 'Chi tiết: ' + msg;
-        }
-        help += '\n\nBạn vẫn có thể dùng ô "Nhập tay" để gõ/dán mã sản phẩm.';
-        showCameraHelp(help);
-        box.style.display='none';
-      });
-  }else{
-    html5Qr.stop().then(()=>{
-      html5Qr.clear();
-      box.style.display='none';
-      cameraOn = false;
-      btn.textContent = '📷 Bật camera';
-    });
+  if(!window.isSecureContext){
+    showCameraHelp('Cần HTTPS để dùng camera. Hãy mở tool qua link https.');
+    return;
   }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showCameraHelp('Trình duyệt không hỗ trợ camera. Hãy dùng Safari (iOS) hoặc Chrome (Android) mới nhất.');
+    return;
+  }
+
+  btn.textContent = '⏳ Đang mở...';
+  btn.disabled = true;
+  box.style.display = 'block';
+
+  // iOS Safari: dùng constraint đơn giản nhất có thể
+  const constraints = {
+    video: {
+      facingMode: 'environment',
+      width:  { ideal: 1280 },
+      height: { ideal: 720 }
+    },
+    audio: false
+  };
+
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch(e1) {
+    // Fallback 1: không dùng ideal size
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch(e2) {
+      // Fallback 2: bất kỳ camera nào
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      } catch(e3) {
+        btn.textContent = '📷 Bật camera';
+        btn.disabled = false;
+        const msg = String(e3);
+        let help = 'Không mở được camera. ';
+        if(msg.includes('NotAllowed') || msg.includes('Permission') || msg.includes('denied')){
+          const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+          help += isIOS
+            ? '📱 iPhone: vào Cài đặt → Safari → Camera → Cho phép. Tải lại trang và bấm "Cho phép" khi được hỏi.'
+            : '🔒 Chạm vào ô địa chỉ → bấm biểu tượng khoá/ⓘ → Camera → Cho phép.';
+        } else if(msg.includes('NotFound')){
+          help += 'Không tìm thấy camera trên thiết bị.';
+        } else if(msg.includes('NotReadable') || msg.includes('abort')){
+          help += 'Camera đang dùng bởi app khác. Đóng app camera/video rồi thử lại.';
+        } else {
+          help += msg.slice(0,120);
+        }
+        help += '\n\nDùng ô "Nhập tay" phía dưới để thay thế.';
+        showCameraHelp(help);
+        box.style.display = 'none';
+        return;
+      }
+    }
+  }
+
+  const video = document.getElementById('camVideo');
+  video.srcObject = camStream;
+  await video.play().catch(()=>{});
+
+  // Khởi tạo detector theo thứ tự ưu tiên
+  camDetector = null;
+  zxingReader  = null;
+
+  // 1. BarcodeDetector native (iOS 17+, Chrome 83+) — nhanh nhất
+  if('BarcodeDetector' in window){
+    try {
+      const supported = await BarcodeDetector.getSupportedFormats();
+      const wantedFmts = ['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','data_matrix','codabar'];
+      const useFmts = wantedFmts.filter(f=>supported.includes(f));
+      camDetector = new BarcodeDetector({ formats: useFmts.length ? useFmts : supported });
+    } catch(e){ camDetector = null; }
+  }
+
+  // 2. ZXing-js fallback — hoạt động trên mọi trình duyệt
+  if(!camDetector && window.ZXing){
+    try {
+      const hints = new Map();
+      const fmts = [
+        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.UPC_A,
+        ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.ITF,
+        ZXing.BarcodeFormat.DATA_MATRIX, ZXing.BarcodeFormat.CODABAR
+      ];
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, fmts);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      zxingReader = new ZXing.MultiFormatReader();
+      zxingReader.setHints(hints);
+    } catch(e){ zxingReader = null; }
+  }
+
+  // Reusable offscreen canvas
+  _offCanvas = document.createElement('canvas');
+  _offCtx    = _offCanvas.getContext('2d', { willReadFrequently: true });
+
+  cameraOn = true;
+  btn.textContent = '📷 Tắt camera';
+  btn.disabled = false;
+  hideCameraHelp();
+  showToast('Giữ mã barcode ngay giữa khung hình');
+  scanLoop();
+}
+
+function stopCamera(){
+  const btn = document.getElementById('btnCam');
+  const box = document.getElementById('qr-reader');
+  if(camRafId){ clearTimeout(camRafId); cancelAnimationFrame(camRafId); camRafId = null; }
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream = null; }
+  const video = document.getElementById('camVideo');
+  if(video){ video.srcObject = null; }
+  box.style.display = 'none';
+  cameraOn = false;
+  camDetector = null;
+  zxingReader  = null;
+  _offCanvas = null; _offCtx = null;
+  btn.textContent = '📷 Bật camera';
+}
+
+let _lastScanTs = 0;
+
+async function scanLoop(){
+  if(!cameraOn) return;
+  const video = document.getElementById('camVideo');
+  if(!video || video.readyState < 2){ camRafId = requestAnimationFrame(scanLoop); return; }
+
+  const vW = video.videoWidth, vH = video.videoHeight;
+  if(!vW || !vH){ camRafId = requestAnimationFrame(scanLoop); return; }
+
+  // ── Crop vùng trung tâm (nơi barcode thường nằm) ──
+  // Lấy dải ngang 100% x 40% giữa màn hình để loại bỏ nhiễu viền
+  const cropH  = Math.floor(vH * 0.45);
+  const cropY  = Math.floor((vH - cropH) / 2);
+  const cropW  = vW;   // full width — barcode có thể gần mép
+
+  if(!_offCanvas){ _offCanvas = document.createElement('canvas'); _offCtx = _offCanvas.getContext('2d',{willReadFrequently:true}); }
+
+  // ── Strategy 1: vùng crop, kích thước gốc ──
+  let code = await _tryDetect(video, 0, cropY, cropW, cropH, cropW, cropH);
+
+  // ── Strategy 2: full frame (barcode to / ở mép) ──
+  if(!code) code = await _tryDetect(video, 0, 0, vW, vH, vW, vH);
+
+  // ── Strategy 3: crop + scale-up 1.5x (barcode nhỏ, xa) ──
+  if(!code){
+    const sc = 1.5;
+    code = await _tryDetect(video, 0, cropY, cropW, cropH, Math.floor(cropW*sc), Math.floor(cropH*sc));
+  }
+
+  // ── Strategy 4: grayscale + boost contrast (mã mờ, ánh sáng kém) ──
+  if(!code) code = await _tryDetectEnhanced(video, 0, cropY, cropW, cropH);
+
+  if(code){
+    const now = Date.now();
+    if(code !== lastScannedCode || now - _lastScanTs > SCAN_COOLDOWN_MS){
+      _lastScanTs = now;
+      addScan(code, true);
+    }
+  }
+
+  // ~20fps — đủ nhạy mà không tốn pin
+  camRafId = setTimeout(()=>{ camRafId = requestAnimationFrame(scanLoop); }, 50);
+}
+
+/* Vẽ vùng sx,sy,sw,sh lên canvas kích thước dw×dh rồi detect */
+async function _tryDetect(video, sx, sy, sw, sh, dw, dh){
+  _offCanvas.width = dw; _offCanvas.height = dh;
+  _offCtx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+  return _runDetectors(_offCanvas);
+}
+
+/* Vẽ + áp grayscale + tăng contrast để detect barcode mờ */
+async function _tryDetectEnhanced(video, sx, sy, sw, sh){
+  const dw = sw, dh = sh;
+  _offCanvas.width = dw; _offCanvas.height = dh;
+  _offCtx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+
+  // Grayscale + contrast boost
+  const img = _offCtx.getImageData(0, 0, dw, dh);
+  const d = img.data;
+  for(let i=0; i<d.length; i+=4){
+    // Luminance
+    let g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    // Contrast stretch: threshold at 128, multiply gap
+    g = g < 128 ? Math.max(0, g*0.6) : Math.min(255, 128 + (g-128)*1.8);
+    d[i] = d[i+1] = d[i+2] = g;
+  }
+  _offCtx.putImageData(img, 0, 0);
+  return _runDetectors(_offCanvas);
+}
+
+/* Thử BarcodeDetector native → ZXing → trả về string hoặc null */
+async function _runDetectors(canvas){
+  // 1. Native BarcodeDetector
+  if(camDetector){
+    try{
+      const res = await camDetector.detect(canvas);
+      if(res && res.length > 0) return res[0].rawValue || null;
+    }catch(e){}
+  }
+
+  // 2. ZXing fallback
+  if(zxingReader){
+    try{
+      const idata = _offCtx.getImageData(0, 0, canvas.width, canvas.height);
+      const src = new ZXing.RGBLuminanceSource(idata.data, canvas.width, canvas.height);
+      const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src));
+      const result = zxingReader.decode(bmp);
+      if(result) return result.getText() || null;
+    }catch(e){
+      // ZXing throws NotFoundException when no code found — that's normal
+    }
+  }
+
+  return null;
 }
 
 function showZoomHint(){
@@ -1314,6 +1498,153 @@ function renderResultList(){
 }
 
 /* ========================= EXPORT EXCEL ========================= */
+function copyResultText(){
+  if(!currentResults || currentResults.length===0){ showToast('Chưa có dữ liệu'); return; }
+
+  const now = new Date().toLocaleString('vi-VN');
+  const store = selectedStore ? (selectedStore.name || selectedStore.id) : '—';
+  const groups = Array.from(selectedGroups).map(k=>k.split('|||')[1]).join(', ');
+
+  const thieu = currentResults.filter(r=>r.status==='thieu');
+  const du    = currentResults.filter(r=>r.status==='du');
+  const ok    = currentResults.filter(r=>r.status==='ok');
+
+  let lines = [];
+  lines.push('📋 BÁO CÁO KIỂM KÊ TỒN KHO');
+  lines.push('🏪 ' + store);
+  lines.push('📂 ' + (groups || '—'));
+  lines.push('🕐 ' + now);
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push(`🔴 THIẾU: ${thieu.length}   🟠 DƯ: ${du.length}   🟢 ĐỦ: ${ok.length}   📦 Tổng: ${currentResults.length}`);
+
+  if(thieu.length > 0){
+    lines.push('');
+    lines.push('🔴 THIẾU (' + thieu.length + ' sản phẩm)');
+    lines.push('─────────────────────────');
+    thieu.forEach(r=>{
+      const diff = r.chenhLech; // negative
+      lines.push(`• ${r.ten}`);
+      lines.push(`  Mã: ${r.maSP}  |  Hệ: ${r.slHe}  Thực: ${r.slThucTe}  →  ${diff}`);
+    });
+  }
+
+  if(du.length > 0){
+    lines.push('');
+    lines.push('🟠 DƯ (' + du.length + ' sản phẩm)');
+    lines.push('─────────────────────────');
+    du.forEach(r=>{
+      const diff = '+' + r.chenhLech;
+      lines.push(`• ${r.ten}`);
+      lines.push(`  Mã: ${r.maSP}  |  Hệ: ${r.slHe}  Thực: ${r.slThucTe}  →  ${diff}`);
+    });
+  }
+
+  if(ok.length > 0){
+    lines.push('');
+    lines.push('🟢 ĐỦ (' + ok.length + ' sản phẩm)');
+    lines.push('─────────────────────────');
+    ok.forEach(r=>{
+      lines.push(`• ${r.ten}  (${r.slHe})`);
+    });
+  }
+
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('Kiểm kê tự động — ' + now);
+
+  const text = lines.join('\n');
+
+  // Try modern clipboard API first
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>{
+      showCopySuccess();
+    }).catch(()=> fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-999px;left:-999px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{
+    document.execCommand('copy');
+    showCopySuccess();
+  }catch(e){
+    showToast('Không copy được — hãy dùng nút Excel hoặc Ảnh');
+  }
+  document.body.removeChild(ta);
+}
+
+function showCopySuccess(){
+  // Show a modal with the text so user can manually copy on iOS if clipboard blocked
+  const existing = document.getElementById('copyModal');
+  if(existing) existing.remove();
+
+  // Try toast first — if clipboard worked, that's enough
+  showToast('✓ Đã copy! Dán vào Zalo / Messenger');
+
+  // Also show a share-ready panel that stays visible for 4s
+  const panel = document.createElement('div');
+  panel.id = 'copyModal';
+  panel.style.cssText = `
+    position:fixed; bottom:calc(80px + env(safe-area-inset-bottom,0px));
+    left:12px; right:12px; z-index:200;
+    background:#1b4332; color:#fff; border-radius:16px;
+    padding:14px 16px; box-shadow:0 4px 24px rgba(0,0,0,.35);
+    animation: slideUp .2s ease;
+  `;
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span style="font-weight:800;font-size:15px;">✓ Đã copy vào clipboard</span>
+      <button onclick="this.parentElement.parentElement.remove()"
+        style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;cursor:pointer;">✕</button>
+    </div>
+    <div style="font-size:13px;opacity:.85;line-height:1.5;">Dán (paste) vào Zalo, Messenger, Teams... để gửi báo cáo ngay.</div>
+    <div style="margin-top:10px;display:flex;gap:8px;">
+      <button onclick="copyResultText(); this.closest('#copyModal').remove();"
+        style="flex:1;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:10px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">🔄 Copy lại</button>
+      <button onclick="shareResultText()"
+        style="flex:1;background:#fff;border:none;color:#1b4332;border-radius:10px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">📤 Chia sẻ</button>
+    </div>`;
+  document.body.appendChild(panel);
+  setTimeout(()=>{ if(panel.parentNode) panel.remove(); }, 5000);
+}
+
+async function shareResultText(){
+  if(!currentResults) return;
+  const now = new Date().toLocaleString('vi-VN');
+  const store = selectedStore ? (selectedStore.name || selectedStore.id) : '—';
+  const thieu = currentResults.filter(r=>r.status==='thieu');
+  const du    = currentResults.filter(r=>r.status==='du');
+  const ok    = currentResults.filter(r=>r.status==='ok');
+
+  let lines = [];
+  lines.push('📋 BÁO CÁO KIỂM KÊ — ' + store);
+  lines.push('🕐 ' + now);
+  lines.push(`🔴 Thiếu: ${thieu.length}  🟠 Dư: ${du.length}  🟢 Đủ: ${ok.length}`);
+  if(thieu.length){
+    lines.push('\n🔴 THIẾU:');
+    thieu.forEach(r=>lines.push(`• ${r.ten} (Hệ:${r.slHe} Thực:${r.slThucTe} → ${r.chenhLech})`));
+  }
+  if(du.length){
+    lines.push('\n🟠 DƯ:');
+    du.forEach(r=>lines.push(`• ${r.ten} (Hệ:${r.slHe} Thực:${r.slThucTe} → +${r.chenhLech})`));
+  }
+  const text = lines.join('\n');
+
+  if(navigator.share){
+    try{
+      await navigator.share({ title: 'Báo cáo kiểm kê', text });
+      return;
+    }catch(e){}
+  }
+  copyResultText();
+}
+
 function exportExcel(){
   if(!currentResults || currentResults.length===0){ showToast('Chưa có dữ liệu kết quả'); return; }
   const rows = currentResults.map(r=>({
