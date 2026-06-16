@@ -157,39 +157,53 @@
   }
 
   /* RESULT SCREEN */
-  .stat-row{display:flex; gap:10px; margin-bottom:14px;}
+  .stat-row{display:flex; gap:8px; margin-bottom:14px;}
   .stat{
-    flex:1; background:var(--paper2); border:1px solid var(--line); border-radius:12px;
-    padding:12px 10px; text-align:center;
+    flex:1; border-radius:14px; padding:13px 6px; text-align:center;
+    border:none;
   }
-  .stat .num{font-size:24px; font-weight:800; font-family:var(--mono);}
-  .stat .lbl{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:2px;}
-  .stat.ok .num{color:var(--ok);}
-  .stat.thieu .num{color:var(--bad);}
-  .stat.du .num{color:var(--warn);}
+  .stat.ok   {background:#e8f5e9;}
+  .stat.thieu{background:#ffebee;}
+  .stat.du   {background:#fff3e0;}
+  .stat .num{font-size:28px; font-weight:900; font-family:var(--mono); line-height:1;}
+  .stat .lbl{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; margin-top:4px;}
+  .stat.ok .num{color:#2e7d32;} .stat.ok .lbl{color:#388e3c;}
+  .stat.thieu .num{color:#c62828;} .stat.thieu .lbl{color:#c62828;}
+  .stat.du .num{color:#e65100;} .stat.du .lbl{color:#e65100;}
 
-  .result-tabs{display:flex; gap:6px; margin-bottom:10px;}
+  .result-tabs{display:flex; gap:6px; margin-bottom:12px;}
   .result-tab{
-    flex:1; padding:9px; border-radius:9px; border:1px solid var(--line); background:var(--paper2);
-    font-size:13px; font-weight:700; text-align:center; cursor:pointer; color:var(--muted);
+    flex:1; padding:10px 4px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--paper2); font-size:13px; font-weight:800; text-align:center;
+    cursor:pointer; color:var(--muted); transition:all .15s;
   }
   .result-tab.active{background:var(--accent); color:#fff; border-color:var(--accent);}
 
   .result-item{
-    background:var(--paper2); border:1px solid var(--line); border-radius:12px;
-    padding:11px 12px; margin-bottom:8px; display:flex; gap:10px; align-items:center;
+    background:#fff; border:1.5px solid var(--line); border-radius:14px;
+    padding:12px 12px 12px 0; margin-bottom:10px; display:flex; gap:0; align-items:stretch;
+    overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.05);
   }
-  .result-item.thieu{border-left:4px solid var(--bad);}
-  .result-item.du{border-left:4px solid var(--warn);}
-  .result-item.ok{border-left:4px solid var(--ok);}
-  .result-item .info{flex:1; font-size:13.5px; line-height:1.35;}
-  .result-item .info .tname{font-weight:600;}
-  .result-item .info .meta{font-size:11px; color:var(--muted); font-family:var(--mono); margin-top:2px;}
-  .result-item .nums{text-align:right; font-family:var(--mono); font-size:13px; flex-shrink:0; min-width:78px;}
-  .result-item .nums .diff{font-weight:800; font-size:16px;}
-  .result-item.thieu .nums .diff{color:var(--bad);}
-  .result-item.du .nums .diff{color:var(--warn);}
-  .result-item.ok .nums .diff{color:var(--ok);}
+  .result-item-bar{width:6px; flex-shrink:0; border-radius:0;}
+  .result-item.thieu .result-item-bar{background:var(--bad);}
+  .result-item.du    .result-item-bar{background:var(--warn);}
+  .result-item.ok    .result-item-bar{background:var(--ok);}
+  .result-item-body{flex:1; display:flex; align-items:center; gap:10px; padding-left:12px;}
+  .result-item .info{flex:1; font-size:14px; line-height:1.35;}
+  .result-item .info .tname{font-weight:800; color:#111; font-size:14px; line-height:1.3;}
+  .result-item .info .meta{font-size:11.5px; color:var(--muted); font-family:var(--mono); font-weight:700; margin-top:3px;}
+  .result-item .info .sl-row{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
+  .result-item .info .sl-badge{
+    font-size:12px; font-weight:800; border-radius:6px; padding:3px 9px;
+  }
+  .result-item .info .sl-he   {background:#eff6f0; color:#1b4332; border:1px solid #c8dfc8;}
+  .result-item .info .sl-thuc {background:#eef2ff; color:#1a237e; border:1px solid #c5caed;}
+  .result-item .nums{text-align:center; flex-shrink:0; min-width:68px; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .result-item .nums .diff{font-weight:900; font-size:26px; font-family:var(--mono); line-height:1;}
+  .result-item .nums .diff-lbl{font-size:11px; font-weight:800; margin-top:2px;}
+  .result-item.thieu .nums .diff{color:var(--bad);}   .result-item.thieu .nums .diff-lbl{color:var(--bad);}
+  .result-item.du    .nums .diff{color:var(--warn);}  .result-item.du    .nums .diff-lbl{color:var(--warn);}
+  .result-item.ok    .nums .diff{color:var(--ok);}    .result-item.ok    .nums .diff-lbl{color:var(--ok);}
 
   .empty-note{text-align:center; color:var(--muted); padding:30px 10px; font-size:14px;}
 
@@ -261,11 +275,12 @@
 <body>
 
 <div class="topbar">
-  <div>
+  <div style="flex:1;min-width:0;">
     <div class="title" id="topTitle">Kiểm Kê Kho</div>
     <div class="sub" id="topSub">933 — TGD_DNA_HCH 351 Nguyễn Hữu Thọ</div>
+    <div id="topApiStatus" style="font-size:10px;font-weight:700;opacity:.75;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
   </div>
-  <div style="display:flex; gap:6px;">
+  <div style="display:flex; gap:6px;flex-shrink:0;">
     <button onclick="goScreen('admin')">Quản lý</button>
     <button id="btnHistoryTop" onclick="goScreen('history')">Lịch sử</button>
   </div>
@@ -326,15 +341,17 @@
   <!-- SCREEN 3: KẾT QUẢ -->
   <section class="screen" id="screen-result">
     <h2 class="section-title">Kết quả kiểm kê</h2>
+    <div id="resultStoreBadge" style="margin-bottom:10px;"></div>
     <div class="stat-row">
-      <div class="stat ok"><div class="num" id="statOk">0</div><div class="lbl">Đủ</div></div>
-      <div class="stat thieu"><div class="num" id="statThieu">0</div><div class="lbl">Thiếu</div></div>
-      <div class="stat du"><div class="num" id="statDu">0</div><div class="lbl">Dư</div></div>
+      <div class="stat thieu"><div class="num" id="statThieu">0</div><div class="lbl">🔴 Thiếu</div></div>
+      <div class="stat du"><div class="num" id="statDu">0</div><div class="lbl">🟠 Dư</div></div>
+      <div class="stat ok"><div class="num" id="statOk">0</div><div class="lbl">🟢 Đủ</div></div>
     </div>
+    <div id="statTotal" style="text-align:center;font-size:13px;font-weight:800;color:var(--muted);margin:-6px 0 12px;"></div>
     <div class="result-tabs">
-      <div class="result-tab active" data-tab="thieu" onclick="setResultTab('thieu')">Thiếu</div>
-      <div class="result-tab" data-tab="du" onclick="setResultTab('du')">Dư</div>
-      <div class="result-tab" data-tab="ok" onclick="setResultTab('ok')">Đủ</div>
+      <div class="result-tab active" data-tab="thieu" onclick="setResultTab('thieu')">🔴 Thiếu</div>
+      <div class="result-tab" data-tab="du" onclick="setResultTab('du')">🟠 Dư</div>
+      <div class="result-tab" data-tab="ok" onclick="setResultTab('ok')">🟢 Đủ</div>
       <div class="result-tab" data-tab="all" onclick="setResultTab('all')">Tất cả</div>
     </div>
     <div id="resultList"></div>
@@ -370,10 +387,12 @@
     </div>
 
     <div class="card">
-      <label class="label-sm">Cấu hình kết nối (1 lần)</label>
-      <div class="info-text" style="margin-top:0;">Dán URL Web App của Google Apps Script (xem hướng dẫn trong README) để bật đồng bộ. Sau khi lưu, mọi máy mở link sẽ tự dùng URL này.</div>
-      <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-      <button class="btn btn-secondary" style="margin-top:10px;" onclick="saveApiUrl()">Lưu cấu hình</button>
+      <label class="label-sm">Cấu hình kết nối</label>
+      <div id="apiVersionBadge" style="margin-bottom:8px;"></div>
+      <div class="info-text" style="margin-top:0;">URL Web App Google Apps Script. Sau khi lưu, mọi máy tự dùng URL này.</div>
+      <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" oninput="onApiUrlInput(this.value)">
+      <div id="apiSaveStatus" style="min-height:18px; margin-top:4px; font-size:12px; font-weight:700;"></div>
+      <button class="btn btn-secondary" style="margin-top:6px;" onclick="saveApiUrl()">💾 Lưu & đồng bộ ngay</button>
     </div>
   </section>
 
@@ -498,8 +517,17 @@ async function loadInventoryFromServer(){
     const dateStr = inventoryUpdatedAt ? new Date(inventoryUpdatedAt).toLocaleString('vi-VN') : '';
     renderSyncBadge('syncBadge', 'ok', dateStr ? ('cập nhật ' + dateStr) : '');
     renderSyncBadge('storeSync', 'ok', dateStr ? ('cập nhật ' + dateStr) : '');
+    // Cập nhật topbar status
+    const topStatus = document.getElementById('topApiStatus');
+    if(topStatus){
+      const savedAt = localStorage.getItem('apiUrlSavedAt');
+      const savedStr = savedAt ? new Date(savedAt).toLocaleString('vi-VN') : '—';
+      topStatus.innerHTML = '🔗 API: ' + savedStr + (dateStr ? '  ·  📦 Kho: ' + dateStr : '');
+    }
   }catch(e){
     renderSyncBadge('syncBadge', 'err');
+    const topStatus = document.getElementById('topApiStatus');
+    if(topStatus) topStatus.innerHTML = '⚠️ Mất kết nối server';
   }
 }
 
@@ -706,17 +734,32 @@ function showLastScan(code, item, newCount){
         ? INVENTORY.filter(it=>String(it.s||'')===String(selectedStore.id))
         : INVENTORY;
       const found = storeInv.find(it=>it.c===code);
-      const groupInfo = found
-        ? `${escapeHtml(found.n)} › ${escapeHtml(found.g)}`
-        : null;
-      box.innerHTML = `<div class="last-scan notfound">
-        <div class="icon">⚠️</div>
-        <div class="info">
-          <div>${escapeHtml(item.t)}</div>
-          <div class="code">${escapeHtml(code)} — ngoài nhóm kiểm kê</div>
-          ${groupInfo ? `<div style="font-size:11px;margin-top:3px;color:var(--muted);">📂 ${groupInfo}</div>` : '<div style="font-size:11px;margin-top:3px;color:var(--muted);">Không thuộc siêu thị này</div>'}
+      let groupHtml = '';
+      if(found){
+        const nganh = escapeHtml(found.n);
+        const nhom  = escapeHtml(found.g);
+        const gkey  = found.n + '|||' + found.g;
+        const alreadyAdded = selectedGroups.has(gkey);
+        groupHtml = `<div style="margin-top:6px; background:#fff3cd; border:1.5px solid #f0b429; border-radius:8px; padding:7px 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:13px; font-weight:700; color:#7c4f00;">📂 ${nganh} › ${nhom}</span>
+          ${alreadyAdded
+            ? '<span style="font-size:12px; color:#888;">✓ Đã có trong nhóm kiểm kê</span>'
+            : `<button onclick="addGroupFromScan(${JSON.stringify(found.n)},${JSON.stringify(found.g)})" style="background:#f0b429;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#fff;white-space:nowrap;">+ Thêm nhóm này</button>`
+          }
+        </div>`;
+      } else {
+        groupHtml = `<div style="margin-top:4px; font-size:12px; color:var(--muted);">Không thuộc siêu thị này</div>`;
+      }
+      box.innerHTML = `<div class="last-scan notfound" style="flex-direction:column; align-items:flex-start; gap:4px;">
+        <div style="display:flex; align-items:center; gap:8px; width:100%;">
+          <div class="icon">⚠️</div>
+          <div class="info" style="flex:1;">
+            <div style="font-weight:700;">${escapeHtml(item.t)}</div>
+            <div class="code">${escapeHtml(code)} — ngoài nhóm kiểm kê</div>
+          </div>
+          <div class="count-badge">×${newCount}</div>
         </div>
-        <div class="count-badge">×${newCount}</div>
+        ${groupHtml}
       </div>`;
     }
   }else{
@@ -771,6 +814,24 @@ function removeScan(code){
   renderScannedList();
 }
 
+function addGroupFromScan(nganh, nhom){
+  const gkey = nganh + '|||' + nhom;
+  selectedGroups.add(gkey);
+  // Rebuild filtered inventory
+  currentInventoryFiltered = INVENTORY.filter(it=>{
+    const k = it.n + '|||' + it.g;
+    return selectedGroups.has(k) && (!selectedStore || String(it.s||'')===String(selectedStore.id));
+  });
+  // Re-render last scan box to update button state
+  const code = lastScannedCode;
+  const item = findItemByCode(code);
+  const count = scannedMap.get(code)||0;
+  if(code && item) showLastScan(code, item, count);
+  showToast('Đã thêm nhóm: ' + nhom);
+  // Update group count badge
+  document.getElementById('selCount').textContent = selectedGroups.size;
+}
+
 function manualSubmit(){
   const inp = document.getElementById('manualInput');
   const v = inp.value.trim();
@@ -813,44 +874,58 @@ function toggleCamera(){
       ],
       verbose: false
     });
+    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
     const config = {
-      fps: 12,
+      fps: isIOS ? 8 : 12,
       qrbox: (viewfinderW, viewfinderH) => {
         const minEdge = Math.min(viewfinderW, viewfinderH);
         return {
-          width: Math.floor(minEdge * 0.85),
-          height: Math.floor(minEdge * 0.55)
+          width:  Math.floor(minEdge * (isIOS ? 0.92 : 0.85)),
+          height: Math.floor(minEdge * (isIOS ? 0.45 : 0.55))
         };
       },
-      aspectRatio: 1.4,
-      disableFlip: false
+      // Không set aspectRatio cứng — Safari iOS không hỗ trợ tốt
+      disableFlip: false,
+      rememberLastUsedCamera: true,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
     };
-    html5Qr.start({ facingMode: "environment" }, config,
+    // iOS Safari cần constraints đơn giản, không dùng advanced constraints
+    const cameraConstraints = isIOS
+      ? { facingMode: { exact: "environment" } }
+      : { facingMode: "environment" };
+
+    const tryStart = (constraints) => html5Qr.start(constraints, config,
       (decodedText)=>{ addScan(decodedText, true); },
-      (err)=>{ /* ignore per-frame errors */ }
-    ).then(()=>{
-      cameraOn = true;
-      btn.textContent = '📷 Tắt camera';
-      hideCameraHelp();
-      showZoomHint();
-    }).catch(err=>{
-      const msg = String(err);
-      let help = 'Không mở được camera. ';
-      if(msg.includes('NotAllowedError') || msg.includes('Permission denied')){
-        help += 'Trình duyệt đang chặn quyền camera cho trang này.\n\n'
-          + 'iPhone (Safari): vào Cài đặt > Safari > Camera, chọn "Hỏi" hoặc "Cho phép". Nếu vẫn lỗi, vào Cài đặt > Safari > Nâng cao > Dữ liệu trang web, xoá dữ liệu của trang này rồi mở lại và bấm "Cho phép" khi được hỏi.\n\n'
-          + 'Android (Chrome): chạm vào biểu tượng khoá/ⓘ trên thanh địa chỉ > Quyền > Camera > Cho phép. Hoặc vào Cài đặt Chrome > Cài đặt trang web > Camera > tìm trang này > Cho phép.';
-      }else if(msg.includes('NotFoundError')){
-        help += 'Không tìm thấy camera trên thiết bị.';
-      }else if(msg.includes('NotReadableError')){
-        help += 'Camera đang được dùng bởi ứng dụng khác. Đóng các app khác đang dùng camera rồi thử lại.';
-      }else{
-        help += 'Chi tiết: ' + msg;
-      }
-      help += '\n\nTrong lúc chờ, bạn vẫn có thể dùng ô "Nhập tay" để gõ/dán mã sản phẩm.';
-      showCameraHelp(help);
-      box.style.display='none';
-    });
+      ()=>{}
+    );
+
+    tryStart(cameraConstraints)
+      .catch(()=> tryStart({ facingMode: "environment" })) // fallback nếu exact fail
+      .then(()=>{
+        cameraOn = true;
+        btn.textContent = '📷 Tắt camera';
+        hideCameraHelp();
+        showZoomHint();
+      }).catch(err=>{
+        const msg = String(err);
+        let help = 'Không mở được camera. ';
+        if(msg.includes('NotAllowedError') || msg.includes('Permission denied')){
+          help += isIOS
+            ? 'iPhone/iPad (Safari): vào Cài đặt → Safari → Camera → chọn "Hỏi" hoặc "Cho phép". Sau đó tải lại trang và bấm Cho phép khi được hỏi. Nếu vẫn lỗi: Cài đặt → Safari → Nâng cao → Dữ liệu trang web → xoá dữ liệu trang này rồi thử lại.'
+            : 'Trình duyệt đang chặn quyền camera. Chạm vào biểu tượng khoá/ⓘ trên thanh địa chỉ → Camera → Cho phép.';
+        }else if(msg.includes('NotFoundError')){
+          help += 'Không tìm thấy camera sau trên thiết bị.';
+        }else if(msg.includes('NotReadableError')){
+          help += 'Camera đang được app khác dùng. Đóng app camera/video rồi thử lại.';
+        }else if(msg.includes('OverconstrainedError') || msg.includes('Overconstrained')){
+          help += 'Thiết bị không hỗ trợ camera sau ở chế độ này. Thử tải lại trang.';
+        }else{
+          help += 'Chi tiết: ' + msg;
+        }
+        help += '\n\nBạn vẫn có thể dùng ô "Nhập tay" để gõ/dán mã sản phẩm.';
+        showCameraHelp(help);
+        box.style.display='none';
+      });
   }else{
     html5Qr.stop().then(()=>{
       html5Qr.clear();
@@ -918,12 +993,25 @@ function finishScan(){
 }
 
 function renderResultStats(){
-  const ok = currentResults.filter(r=>r.status==='ok').length;
+  const ok    = currentResults.filter(r=>r.status==='ok').length;
   const thieu = currentResults.filter(r=>r.status==='thieu').length;
-  const du = currentResults.filter(r=>r.status==='du').length;
-  document.getElementById('statOk').textContent = ok;
+  const du    = currentResults.filter(r=>r.status==='du').length;
+  const total = currentResults.length;
+  document.getElementById('statOk').textContent    = ok;
   document.getElementById('statThieu').textContent = thieu;
-  document.getElementById('statDu').textContent = du;
+  document.getElementById('statDu').textContent    = du;
+  const totalEl = document.getElementById('statTotal');
+  if(totalEl) totalEl.textContent = 'Tổng ' + total + ' sản phẩm';
+
+  // Store badge trên màn kết quả
+  const badge = document.getElementById('resultStoreBadge');
+  if(badge && selectedStore){
+    const groups = Array.from(selectedGroups).map(k=>k.split('|||')[1]).join(' · ');
+    badge.innerHTML = `<div style="background:#eaf4ee;border:1px solid #c8e3d2;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:#1b4332;line-height:1.5;">
+      🏪 <b>${escapeHtml(selectedStore.name||selectedStore.id)}</b>
+      <span style="color:#555;font-weight:600;"> · 📂 ${escapeHtml(groups||'—')}</span>
+    </div>`;
+  }
 }
 
 function setResultTab(tab){
@@ -948,18 +1036,23 @@ function renderResultList(){
     const div = document.createElement('div');
     div.className = 'result-item ' + r.status;
     const diffStr = r.chenhLech>0 ? '+'+r.chenhLech : String(r.chenhLech);
-    const diffColor = r.chenhLech !== 0 ? 'color:#d32f2f;' : 'color:var(--ok);';
-    div.innerHTML = `<div class="info">
-        <div class="tname">${escapeHtml(r.ten)}</div>
-        <div class="meta">${escapeHtml(r.maSP)} · ${escapeHtml(r.nganh)} / ${escapeHtml(r.nhom)}</div>
-        <div class="meta" style="margin-top:4px; font-size:12px;">
-          <span style="background:#f0f0f0;border-radius:4px;padding:2px 7px;margin-right:4px;">Hệ: <b>${r.slHe}</b></span>
-          <span style="background:#f0f0f0;border-radius:4px;padding:2px 7px;">Thực: <b>${r.slThucTe}</b></span>
+    const diffLbl = r.chenhLech===0?'Đủ':r.chenhLech<0?'Thiếu':'Dư';
+    div.innerHTML = `
+      <div class="result-item-bar"></div>
+      <div class="result-item-body">
+        <div class="info">
+          <div class="tname">${escapeHtml(r.ten)}</div>
+          <div class="meta">${escapeHtml(r.maSP)}</div>
+          <div class="meta">${escapeHtml(r.nganh)} / ${escapeHtml(r.nhom)}</div>
+          <div class="sl-row">
+            <span class="sl-badge sl-he">Hệ: ${r.slHe}</span>
+            <span class="sl-badge sl-thuc">Thực: ${r.slThucTe}</span>
+          </div>
         </div>
-      </div>
-      <div class="nums" style="min-width:64px;">
-        <div class="diff" style="${diffColor} font-size:22px; font-weight:900; line-height:1;">${diffStr}</div>
-        <div style="font-size:11px; color:var(--muted); margin-top:2px;">${r.chenhLech===0?'Đủ':r.chenhLech<0?'Thiếu':'Dư'}</div>
+        <div class="nums">
+          <div class="diff">${diffStr}</div>
+          <div class="diff-lbl">${diffLbl}</div>
+        </div>
       </div>`;
     container.appendChild(div);
   });
@@ -993,20 +1086,177 @@ function pad(n){ return n.toString().padStart(2,'0'); }
 /* ===== XUẤT ẢNH KẾT QUẢ ===== */
 async function exportResultImage(){
   if(!currentResults || currentResults.length===0){ showToast('Chưa có dữ liệu kết quả'); return; }
-  const target = document.getElementById('screen-result');
   showToast('Đang tạo ảnh...');
-  try{
-    const canvas = await html2canvas(target, {backgroundColor:'#ffffff', scale:2, useCORS:true});
-    const link = document.createElement('a');
-    const now = new Date();
-    const fname = `KiemKe_933_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.png`;
-    link.download = fname;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    showToast('Đã xuất ảnh: ' + fname);
-  }catch(e){
-    showToast('Lỗi xuất ảnh');
+  await new Promise(r=>setTimeout(r,60));
+
+  const now      = new Date();
+  const dateStr  = now.toLocaleString('vi-VN');
+  const store    = selectedStore ? (selectedStore.name || selectedStore.id) : '—';
+  const groups   = Array.from(selectedGroups).map(k=>k.split('|||')[1]).join(' · ') || '—';
+  const all=currentResults;
+  const thieu=all.filter(r=>r.status==='thieu');
+  const du   =all.filter(r=>r.status==='du');
+  const ok   =all.filter(r=>r.status==='ok');
+  const sections=[
+    {items:thieu, label:'THIẾU', bar:'#c62828', rowBg:'#fff0f0', altBg:'#ffe0e0'},
+    {items:du,    label:'DƯ',    bar:'#bf5c00', rowBg:'#fff5e6', altBg:'#ffe8c8'},
+    {items:ok,    label:'ĐỦ',    bar:'#1b6b35', rowBg:'#f0fff4', altBg:'#d8f5e3'},
+  ].filter(s=>s.items.length);
+
+  /* ---- layout constants ---- */
+  const W        = 1080;
+  const PAD      = 36;
+  const CW       = W - PAD*2;
+  const HDR_H    = 220;
+  const SEC_H    = 46;
+  const ROW_H    = 100;
+  const FOOT_H   = 36;
+
+  let totalH = HDR_H + FOOT_H + PAD;
+  sections.forEach(s=>{ totalH += SEC_H + s.items.length * ROW_H + 16; });
+
+  const cv  = document.createElement('canvas');
+  cv.width  = W;
+  cv.height = totalH;
+  const cx  = cv.getContext('2d');
+
+  /* ---- helpers ---- */
+  function rect(x,y,w,h,r,fill){
+    cx.fillStyle=fill;
+    cx.beginPath();
+    cx.roundRect(x,y,w,h,r??0);
+    cx.fill();
   }
+  function txt(str,x,y,size,weight,color,align){
+    cx.font=(weight||'700')+' '+(size||14)+'px Arial,sans-serif';
+    cx.fillStyle=color||'#111';
+    cx.textAlign=align||'left';
+    cx.fillText(str,x,y);
+    cx.textAlign='left';
+  }
+  function wrapTxt(str,x,y,maxW,size,weight,color,lineH){
+    cx.font=(weight||'700')+' '+(size||14)+'px Arial,sans-serif';
+    cx.fillStyle=color||'#111';
+    const words=str.split(' ');
+    let line='';
+    let cy=y;
+    words.forEach(w=>{
+      const test=line?line+' '+w:w;
+      if(cx.measureText(test).width>maxW && line){
+        cx.fillText(line,x,cy);
+        line=w; cy+=lineH||20;
+      } else { line=test; }
+    });
+    cx.fillText(line,x,cy);
+    return cy;
+  }
+
+  /* ===== HEADER ===== */
+  // Dark green bg
+  cx.fillStyle='#1b4332';
+  cx.fillRect(0,0,W,HDR_H);
+
+  // Accent stripe
+  cx.fillStyle='#2d6a4f';
+  cx.fillRect(0,HDR_H-6,W,6);
+
+  // Title
+  txt('BÁO CÁO KIỂM KÊ TỒN KHO', PAD, 52, 28, '900', '#ffffff');
+
+  // Store & groups
+  txt('🏪  '+store,  PAD, 88,  15, '700', '#86efac');
+  txt('📂  '+groups, PAD, 112, 13, '700', '#bbf7d0');
+  txt('🕐  '+dateStr,PAD, 133, 13, '700', '#bbf7d0');
+
+  // Stat boxes
+  const stats=[
+    {l:'THIẾU', v:thieu.length, bg:'#ef4444', tx:'#fff'},
+    {l:'DƯ',    v:du.length,    bg:'#f97316', tx:'#fff'},
+    {l:'ĐỦ',    v:ok.length,    bg:'#22c55e', tx:'#fff'},
+    {l:'TỔNG',  v:all.length,   bg:'#3b82f6', tx:'#fff'},
+  ];
+  const bw=230, bh=58, by=HDR_H-78;
+  stats.forEach((s,i)=>{
+    const bx=PAD+i*(bw+12);
+    rect(bx,by,bw,bh,10,s.bg);
+    // shadow effect
+    cx.fillStyle='rgba(0,0,0,.15)';
+    cx.fillRect(bx,by+bh-4,bw,4);
+    txt(String(s.v), bx+20, by+38, 30, '900', s.tx);
+    txt(s.l,         bx+72, by+38, 14, '800', s.tx);
+  });
+
+  /* ===== SECTIONS ===== */
+  let y = HDR_H + 20;
+
+  sections.forEach(sec=>{
+    // Section header bar
+    rect(PAD, y, CW, SEC_H, [8,8,0,0], sec.bar);
+    txt(sec.label+'  ('+sec.items.length+' sản phẩm)', PAD+16, y+30, 16, '900', '#ffffff');
+    y += SEC_H;
+
+    sec.items.forEach((r,idx)=>{
+      const bg = idx%2===0 ? sec.rowBg : sec.altBg;
+      cx.fillStyle = bg;
+      cx.fillRect(PAD, y, CW, ROW_H);
+
+      // left accent bar
+      cx.fillStyle = sec.bar;
+      cx.fillRect(PAD, y, 6, ROW_H);
+
+      // separator
+      cx.fillStyle='rgba(0,0,0,.06)';
+      cx.fillRect(PAD+6, y, CW-6, 1);
+
+      // Product name — wrap
+      const nameY = wrapTxt(r.ten, PAD+18, y+24, CW-160, 15, '800', '#0a0a0a', 21);
+
+      // Barcode
+      txt(r.maSP, PAD+18, nameY+20, 12, '700', '#333333');
+
+      // Nganh / Nhom
+      txt(r.nganh+' / '+r.nhom, PAD+18, nameY+38, 11, '700', '#555555');
+
+      // SL badges
+      const badgeY = nameY+50;
+      // Hệ badge
+      rect(PAD+18, badgeY, 100, 26, 5, '#1b4332');
+      txt('Hệ: '+r.slHe, PAD+18+10, badgeY+18, 13, '800', '#ffffff');
+      // Thực badge
+      rect(PAD+128, badgeY, 110, 26, 5, '#1a237e');
+      txt('Thực: '+r.slThucTe, PAD+128+10, badgeY+18, 13, '800', '#ffffff');
+
+      // Diff badge (right)
+      const diff = r.chenhLech>0?'+'+r.chenhLech:String(r.chenhLech);
+      const diffBg  = r.chenhLech===0?'#15803d':(r.chenhLech<0?'#b91c1c':'#c2410c');
+      const badgeRW = 110, badgeRH = 62;
+      const bRx = W-PAD-badgeRW, bRy = y+(ROW_H-badgeRH)/2;
+      rect(bRx, bRy, badgeRW, badgeRH, 10, diffBg);
+      txt(diff, bRx+badgeRW/2, bRy+40, 30, '900', '#ffffff', 'center');
+      txt(r.chenhLech===0?'Đủ':r.chenhLech<0?'Thiếu':'Dư', bRx+badgeRW/2, bRy+56, 11, '800', 'rgba(255,255,255,.85)', 'center');
+
+      y += ROW_H;
+    });
+
+    // Bottom border of section
+    cx.fillStyle=sec.bar;
+    cx.fillRect(PAD, y, CW, 2);
+    y += 18;
+  });
+
+  /* ===== FOOTER ===== */
+  cx.fillStyle='#1b4332';
+  cx.fillRect(0, totalH-FOOT_H, W, FOOT_H);
+  txt('Kiểm kê tự động  ·  Xuất lúc '+dateStr+'  ·  Tổng '+all.length+' sản phẩm',
+      PAD, totalH-FOOT_H+23, 12, '700', '#bbf7d0');
+
+  /* ===== SAVE ===== */
+  const link=document.createElement('a');
+  const fname='KiemKe_'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'_'+pad(now.getHours())+pad(now.getMinutes())+'.png';
+  link.download=fname;
+  link.href=cv.toDataURL('image/png');
+  link.click();
+  showToast('Đã xuất ảnh: '+fname);
 }
 
 /* ========================= HISTORY ========================= */
@@ -1164,7 +1414,10 @@ function goToSelect(){
 /* ========================= INIT ========================= */
 (function autoSetApiUrl(){
   var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzEsE_ZnFjPBOleKS3EJDTxjHJN0lIYJlEU6tKw5nprMpN6f9ZatcXwfdA5ZqlpQUey7A/exec';
-  if(!getApiUrl()) setApiUrl(DEFAULT_API_URL);
+  if(!getApiUrl()){
+    setApiUrl(DEFAULT_API_URL);
+    localStorage.setItem('apiUrlSavedAt', '2026-06-16T07:00:00.000Z');
+  }
 })();
 GROUP_INDEX = buildGroupIndex();
 renderGroupList();
@@ -1173,12 +1426,44 @@ loadInventoryFromServer().then(()=>{ renderStoreList(); }).catch(()=>{ renderSto
 /* ========================= ADMIN SCREEN ========================= */
 let pendingUploadItems = null;
 
+function renderApiVersionBadge(){
+  const url = getApiUrl();
+  const el = document.getElementById('apiVersionBadge');
+  if(!el) return;
+  if(!url){
+    el.innerHTML = '<div style="background:#faeae7;border:1.5px solid #f0c9c0;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:#c62828;">⚠️ Chưa cấu hình URL kết nối</div>';
+    return;
+  }
+  const match = url.match(/\/s\/([^\/]+)\/exec/);
+  const shortId = match ? match[1].slice(0,16)+'…' : url.slice(0,30)+'…';
+  const savedTime = localStorage.getItem('apiUrlSavedAt') || '';
+  const timeStr = savedTime ? new Date(savedTime).toLocaleString('vi-VN') : '—';
+  el.innerHTML = '<div style="background:#eaf4ee;border:1.5px solid #c8e3d2;border-radius:10px;padding:10px 14px;font-size:12px;line-height:1.7;">'
+    + '<div style="font-weight:900;color:#1b4332;font-size:13px;">✅ Đã kết nối Google Apps Script</div>'
+    + '<div style="color:#444;font-weight:700;font-family:monospace;font-size:11px;">ID: ' + shortId + '</div>'
+    + '<div style="color:#555;font-weight:700;font-size:11.5px;">🕐 Lưu lúc: ' + timeStr + '</div>'
+    + '</div>';
+}
+
+function onApiUrlInput(val){
+  const statusEl = document.getElementById('apiSaveStatus');
+  if(!statusEl) return;
+  val = val.trim();
+  if(!val){ statusEl.textContent = ''; return; }
+  if(val.indexOf('script.google.com') >= 0){
+    statusEl.innerHTML = '<span style="color:var(--ok)">✓ URL hợp lệ — nhấn Lưu để áp dụng</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--bad)">⚠️ URL không đúng định dạng</span>';
+  }
+}
+
 function initAdminScreen(){
   const dateStr = inventoryUpdatedAt ? new Date(inventoryUpdatedAt).toLocaleString('vi-VN') : 'chưa rõ (đang dùng dữ liệu có sẵn trong tool)';
   document.getElementById('uploadStatus').textContent = '';
   document.getElementById('uploadStatus').innerHTML =
-    `Tồn kho hiện tại: <b>${INVENTORY.length}</b> mã sản phẩm. Cập nhật lần cuối: <b>${dateStr}</b>.`;
+    '<b>' + INVENTORY.length + '</b> mã SP trong kho. Cập nhật lần cuối: <b>' + dateStr + '</b>.';
   document.getElementById('apiUrlInput').value = getApiUrl();
+  renderApiVersionBadge();
 
   const drop = document.getElementById('fileDrop');
   drop.ondragover = (e)=>{ e.preventDefault(); drop.classList.add('dragover'); };
@@ -1195,8 +1480,19 @@ function initAdminScreen(){
 function saveApiUrl(){
   const val = document.getElementById('apiUrlInput').value.trim();
   setApiUrl(val);
-  showToast(val ? 'Đã lưu cấu hình' : 'Đã xoá cấu hình');
-  loadInventoryFromServer();
+  if(val) localStorage.setItem('apiUrlSavedAt', new Date().toISOString());
+  else localStorage.removeItem('apiUrlSavedAt');
+  const statusEl = document.getElementById('apiSaveStatus');
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Đã lưu — đang đồng bộ...</span>';
+  renderApiVersionBadge();
+  showToast(val ? 'Đã lưu & đang đồng bộ...' : 'Đã xoá cấu hình');
+  loadInventoryFromServer().then(()=>{
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Đã lưu & đồng bộ thành công</span>';
+    showToast('Đồng bộ xong!');
+    renderApiVersionBadge();
+  }).catch(()=>{
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--bad)">Đã lưu nhưng không kết nối được server</span>';
+  });
 }
 
 function handleFileSelect(event){
