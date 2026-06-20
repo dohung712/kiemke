@@ -718,7 +718,7 @@ let inventoryUpdatedAt = null;
 let GROUP_INDEX = {};
 
 /* ========================= API / SYNC ========================= */
-const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbys-g-4ot6pFXXJk7lw6M--FGHQ9ifmJA0HPVJVi3It0WSc4zmSISD63pajGpPsYVswFQ/exec';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbw0Wgwc2xvV1QNzhwFJIhWzVrd1BY9k-EqDuYMf51k_N5cqdJ_pXC5mqaf7lpwTRHFqMg/exec';
 function getApiUrl(){
   try{ return localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL; }catch(e){ return DEFAULT_API_URL; }
 }
@@ -1038,8 +1038,13 @@ function handleCameraDecode(rawCode){
   const code = normalizeCode((rawCode||'').trim());
   if(!code) return;
   scanBurstBuffer.push(code);
-  if(scanBurstTimer) clearTimeout(scanBurstTimer);
-  scanBurstTimer = setTimeout(resolveScanBurst, SCAN_BURST_WINDOW_MS);
+  // Cửa sổ cố định tính từ lần quét ĐẦU TIÊN trong burst — không reset lại mỗi
+  // lần có code mới. Nếu dùng debounce (reset mỗi lần callback bắn), trên iPhone
+  // camera bắn callback liên tục khi giữ mã trước ống kính sẽ khiến timer không
+  // bao giờ chạy được, làm cho việc quét bị "im lặng" không nhận mã.
+  if(!scanBurstTimer){
+    scanBurstTimer = setTimeout(resolveScanBurst, SCAN_BURST_WINDOW_MS);
+  }
 }
 
 function resolveScanBurst(){
@@ -2166,7 +2171,7 @@ function toggleInvBlock(id){
 
 /* ========================= INIT ========================= */
 (function autoSetApiUrl(){
-  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbys-g-4ot6pFXXJk7lw6M--FGHQ9ifmJA0HPVJVi3It0WSc4zmSISD63pajGpPsYVswFQ/exec';
+  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbw0Wgwc2xvV1QNzhwFJIhWzVrd1BY9k-EqDuYMf51k_N5cqdJ_pXC5mqaf7lpwTRHFqMg/exec';
   if(!getApiUrl()){
     setApiUrl(DEFAULT_API_URL);
     localStorage.setItem('apiUrlSavedAt', '2026-06-16T07:00:00.000Z');
@@ -2550,8 +2555,11 @@ function handleImeiCameraDecode(rawImei){
   const imei = normalizeImei((rawImei||'').trim());
   if(!imei) return;
   imeiBurstBuffer.push(imei);
-  if(imeiBurstTimer) clearTimeout(imeiBurstTimer);
-  imeiBurstTimer = setTimeout(resolveImeiBurst, IMEI_BURST_WINDOW_MS);
+  // Cửa sổ cố định tính từ lần quét đầu tiên — không reset mỗi lần có callback mới
+  // (xem giải thích chi tiết ở handleCameraDecode, luồng SKU).
+  if(!imeiBurstTimer){
+    imeiBurstTimer = setTimeout(resolveImeiBurst, IMEI_BURST_WINDOW_MS);
+  }
 }
 
 function resolveImeiBurst(){
